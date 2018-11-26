@@ -1,2 +1,1 @@
-# image_denoising
-Optimization Project
+# Image_Denoising
