@@ -1,22 +1,32 @@
+clear
+clc
+load('Y_01.mat');
+
 tic
 
 %% loading image and its dimensions, X_clean is the clean image to test
+%{
 X_clean = imread('lena.tiff');
 X_clean = rgb2gray(X_clean);
 %X_clean = imresize(X_clean, 0.5);
-X_clean = imresize(X_clean, [100 100]);
-[h,w] = size(X_clean);
-k=power(power(h,0.5)+5,2);
+X_clean = imresize(X_clean, [36 36]);
+%}
+Y=Y3;
+[h,w] = size(Y);
+k=power(power(h,0.5)+1,2);
 
 %% adding noise to our image 
+%{
 mean_noise = 0;
-var_noise = 0.001;
+var_noise = 0.01;
 Y = imnoise(X_clean,'gaussian',mean_noise, var_noise);
 imshowpair(Y,X_clean, 'montage')
 %initializing clean image with noisy image at first 
 Y = double(Y);
-%X = double(imnoise(X_clean,'gaussian',mean_noise, 0.0001));
+%}
+%X = double(imnoise(X_clean,'gaussian',mean_noise, 0.009));
 X = Y;
+
 %{
 Y = Noisy Image 
 Penalty parameters = lambda_1, lambda_2, mu 
@@ -26,7 +36,7 @@ Clean Image = X
 %}
 
 %% from table 1 for p =2 
-lambda_1 = 10; 
+lambda_1 = 20; 
 lambda_2 = 0.1;
 patch_size = power(h,0.5);
 R  = Ri(patch_size,h,w);
@@ -109,7 +119,7 @@ end
 %Line 18
 %phi = (X*Omega')*((Omega*Omega')^(-1))
 
-A=20;
+A=5;
 K=k;
 a=1;
 
@@ -121,7 +131,7 @@ for i=1:no_of_patches
 end
 X_1 = reshape(X_1',[],1); %converting into vector for R_i
 while(a<=A)
-    
+    %phi = (X*Omega')*((Omega*Omega')^(-1));
     X=(((1/mu)*eye(h*w)+rit)^(-1))*(((1/mu)*X_1)+rit_2);
     X = transpose(reshape(X,w,h));
     E=X-(phi*Omega);
@@ -182,7 +192,7 @@ function [X] = argmin(mu,X,X_1_t1,phi,Omega,no_of_patches,R)
         for i=1:size(Omega,2)
             norm(Omega(:,i),0) <= T;
         end
-        
+    
     cvx_end
 end
 
