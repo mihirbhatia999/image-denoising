@@ -1,18 +1,22 @@
-%% loading image and it's dimensions, X_clean is the clean image to test
-X_clean = imread('lenna.tiff');
+tic
+
+%% loading image and its dimensions, X_clean is the clean image to test
+X_clean = imread('lena.tiff');
 X_clean = rgb2gray(X_clean);
-X_clean = imresize(X_clean, 0.125);
+%X_clean = imresize(X_clean, 0.5);
+X_clean = imresize(X_clean, [100 100]);
 [h,w] = size(X_clean);
+k=power(power(h,0.5)+5,2);
 
 %% adding noise to our image 
 mean_noise = 0;
-var_noise = 0.01;
+var_noise = 0.001;
 Y = imnoise(X_clean,'gaussian',mean_noise, var_noise);
 imshowpair(Y,X_clean, 'montage')
 %initializing clean image with noisy image at first 
 Y = double(Y);
 %X = double(imnoise(X_clean,'gaussian',mean_noise, 0.0001));
-X = double(X_clean);
+X = Y;
 %{
 Y = Noisy Image 
 Penalty parameters = lambda_1, lambda_2, mu 
@@ -21,9 +25,11 @@ Stopping tolerance = e1, e2
 Clean Image = X 
 %}
 
-%% from table 1 for p =1 
+%% from table 1 for p =2 
 lambda_1 = 10; 
 lambda_2 = 0.1;
+patch_size = power(h,0.5);
+R  = Ri(patch_size,h,w);
 sigma = 3 ; %for additive noise 
 mu = sigma/30;
 %delta = 0.12;  %p=1
@@ -34,19 +40,19 @@ e2 = 0.001;
 %initializing
 %k > n ---> it limits the rank of dictionary to n
 n = h;
-k = 81;
+%k = 81;
 
 %dictionary 
-phi = zeros(power(n,0.5),power(k,0.5));
-for i = 1:power(n,0.5)
+phi = zeros(power(patch_size*patch_size,0.5),power(k,0.5));
+for i = 1:power(patch_size*patch_size,0.5)
     for j = 1:power(k,0.5)
       phi(i,j) = cos((i-1)*(j-1)*(pi/11)) ;
     end
 end
-size(phi)
-phi = kron(phi,phi);
 
-patch_size = 8;
+phi = kron(phi,phi);
+size(phi)
+
 S = zeros(h,w,'double');
 X_2 = zeros(h,w);
 X_1 = zeros(h,w);   %change
@@ -60,8 +66,8 @@ a = 1;
 j = 1;
 delta_1 = e1 + 1;
 delta_2 = e2 + 1;
-tmax = 10;  % to change
-smax = 20 ; % change
+tmax = 2;  % to change
+smax = 5 ; % change
 p=2;
 T=20;       %own value
 
@@ -80,7 +86,7 @@ while (delta_1>=e1) && (t<=tmax)
         s=s+1;
     end 
     X_1_t1 = X;
-    X_2_t1 = argmin(mu,X,X_1_t1,phi,Omega,no_of_patches,patch_size);
+    X_2_t1 = argmin(mu,X,X_1_t1,phi,Omega,no_of_patches,R);
     delta_1 = min(power(norm(X_1_t1-X_1,'fro'),2),power(norm(X_2_t1-X_2,'fro'),2));
     X_1 = X_1_t1;
     X_2 = X_2_t1;
@@ -94,7 +100,8 @@ X = X_2;
 % Sparse coding stage
 k_0 = 15;   %change
 for i = 1:no_of_patches
-    Omega(:,i) = omp(phi,patch(i,patch_size, X),k_0);
+    %Omega(:,i) = omp(phi,patch(i,patch_size, X),k_0);
+    Omega(:,i) = omp(phi, R(:,:,i)*reshape(X',[],1),k_0);
 end
 
 %% Update dictionary
@@ -102,11 +109,10 @@ end
 %Line 18
 %phi = (X*Omega')*((Omega*Omega')^(-1))
 
-A=2;
+A=20;
 K=k;
 a=1;
 
-R  = Ri(patch_size,h,w);
 rit=zeros(h*w,h*w);
 rit_2=zeros(h*w,1);
 for i=1:no_of_patches
@@ -131,6 +137,7 @@ while(a<=A)
     a=a+1;
 end
 
+toc
 
 %% functions  
 %Function argmin
@@ -160,7 +167,7 @@ function [X] = argmin_X(Y,X,S,lambda_1,L,delta,mu,X_2,p)
 end 
 
 
-function [X] = argmin(mu,X,X_1_t1,phi,Omega,no_of_patches,patch_size)
+function [X] = argmin(mu,X,X_1_t1,phi,Omega,no_of_patches,R)
     fprintf('argmin function called')
     [h,w] = size(X);
     kernel = -1 * ones(3);
@@ -170,7 +177,7 @@ function [X] = argmin(mu,X,X_1_t1,phi,Omega,no_of_patches,patch_size)
    
     cvx_begin
         variable X(h,w)
-        minimize ((1/mu)*square_pos(norm(X-X_1_t1,'fro'))+patch_sum(X,phi,Omega,patch_size,no_of_patches)) 
+        minimize ((1/mu)*square_pos(norm(X-X_1_t1,'fro'))+patch_sum(X,phi,Omega,no_of_patches,R)) 
         subject to
         for i=1:size(Omega,2)
             norm(Omega(:,i),0) <= T;
@@ -179,6 +186,7 @@ function [X] = argmin(mu,X,X_1_t1,phi,Omega,no_of_patches,patch_size)
     cvx_end
 end
 
+%{
 function [image_patch] = patch(i,patch_size, X)
     [h,w] = size(X);
     c = mod(i,(w/(patch_size))) ;
@@ -194,11 +202,12 @@ function [image_patch] = patch(i,patch_size, X)
     image_patch = X(xmin:xmin+(patch_size-1),ymin:ymin+(patch_size-1));
     image_patch = reshape(image_patch,[],1);
 end
+%}
 
-function [p_sum] = patch_sum(X,phi,Omega,patch_size,no_of_patches)
+function [p_sum] = patch_sum(X,phi,Omega,no_of_patches,R)
     p_sum=0;
     for i = 1:no_of_patches
-        p_sum=p_sum+square_pos(norm((patch(i,patch_size,X)-(phi*Omega(:,i))),2));
+        p_sum=p_sum+square_pos(norm((R(:,:,i)*reshape(X',[],1)-(phi*Omega(:,i))),2));
     end
 end
 
@@ -207,14 +216,14 @@ function [R] = Ri(patch_size,h,w)
     %image_patch = reshape(image_patch,[],1);
 no_of_patches = (h*w)/(patch_size*patch_size);
 R = zeros(patch_size*patch_size, h*w, no_of_patches);
-for k = 1:no_of_patches
-    c = mod(k,(w/(patch_size))) ;
+for u = 1:no_of_patches
+    c = mod(u,(w/(patch_size))) ;
     if c==0
-        c=patch_size;
+        c=w/patch_size;
     end
-    r = floor(k/(w/(patch_size))) + 1;
-    if mod(k,(w/(patch_size)))==0 
-        r=k/(w/(patch_size));
+    r = floor(u/(w/(patch_size))) + 1;
+    if mod(u,(w/(patch_size)))==0 
+        r=u/(w/(patch_size));
     end
     xmin = (r-1)*patch_size + 1; 
     ymin = (c-1)*patch_size + 1 ;
@@ -222,7 +231,7 @@ for k = 1:no_of_patches
     %giving 1 
       for b = 1:patch_size 
        for a = 1:patch_size
-           R((b - 1)*patch_size + a,(xmin-1 + b - 1)*w + ymin + (a-1),k) = 1 ;
+           R((b - 1)*patch_size + a,(xmin-1 + b - 1)*w + ymin + (a-1),u) = 1 ;
        end 
       end
   
