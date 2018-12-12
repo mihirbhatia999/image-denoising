@@ -11,7 +11,7 @@ X_clean = rgb2gray(X_clean);
 %X_clean = imresize(X_clean, 0.5);
 X_clean = imresize(X_clean, [36 36]);
 %}
-Y=Y3;
+Y=imresize(Y3,[36 36]);
 [h,w] = size(Y);
 k=power(power(h,0.5)+1,2);
 
@@ -36,11 +36,11 @@ Clean Image = X
 %}
 
 %% from table 1 for p =2 
-lambda_1 = 20; 
+lambda_1 = 0.1; 
 lambda_2 = 0.1;
 patch_size = power(h,0.5);
 R  = Ri(patch_size,h,w);
-sigma = 3 ; %for additive noise 
+sigma = 20 ; %for additive noise 
 mu = sigma/30;
 %delta = 0.12;  %p=1
 delta = 0;
@@ -131,7 +131,7 @@ for i=1:no_of_patches
 end
 X_1 = reshape(X_1',[],1); %converting into vector for R_i
 while(a<=A)
-    %phi = (X*Omega')*((Omega*Omega')^(-1));
+    phi = (X*Omega')*((Omega*Omega')^(-1));
     X=(((1/mu)*eye(h*w)+rit)^(-1))*(((1/mu)*X_1)+rit_2);
     X = transpose(reshape(X,w,h));
     E=X-(phi*Omega);
